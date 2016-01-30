@@ -26,7 +26,7 @@ OneWire oneWire(ONE_WIRE_BUS);
 DallasTemperature sensors(&oneWire);
 
 float currentTemp;
-float targetTemp;
+float targetTemp = 21;
 
 bool isPumpOn = false;
 bool heaterOn = false;
@@ -37,7 +37,6 @@ bool outputNeedsToBeUpdated = true;
 void setup()
 {
   Serial.begin(9600);
-  targetTemp = 55;
   sensors.begin();
   display.initialize();
   pinMode(PIN_KEYBOARD_UP, INPUT_PULLUP);
@@ -95,8 +94,7 @@ void updateCurrentTemp() {
 
 void updateHeaterAndPump() {
   if (outputNeedsToBeUpdated) {
-    isHeaterOn = heaterOn && currentTemp < targetTemp;  
-
+    isHeaterOn = heaterOn && ((!isHeaterOn && currentTemp + 0.25 < targetTemp) || (isHeaterOn && currentTemp - 0.25 < targetTemp));  
     digitalWrite(PIN_PUMP, !isPumpOn);
     digitalWrite(PIN_HEATER, !isHeaterOn);
     outputNeedsToBeUpdated = false;
