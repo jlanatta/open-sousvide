@@ -11,11 +11,12 @@
 #define SCL_PIN 9
 #define PIN_KEYBOARD_UP 11
 #define PIN_KEYBOARD_DOWN 12
-#define PIN_KEYBOARD_ON 13
+#define PIN_KEYBOARD_PUMP 13
+#define PIN_KEYBOARD_HEATER 10
 #define PIN_HEATER 3
 #define PIN_PUMP 4
 
-Adafruit_ssd1306syp display(SDA_PIN,SCL_PIN);
+Adafruit_ssd1306syp display(SDA_PIN, SCL_PIN);
  
 // Setup a oneWire instance to communicate with any OneWire devices 
 // (not just Maxim/Dallas temperature ICs)
@@ -26,17 +27,23 @@ DallasTemperature sensors(&oneWire);
 
 float currentTemp;
 float targetTemp;
+
+bool isPumpOn = false;
 bool heaterOn = false;
-bool isOn = false;
+bool isHeaterOn = false;
+bool displayNeedsToBeUpdated = true;
+bool outputNeedsToBeUpdated = true;
 
 void setup()
 {
+  Serial.begin(9600);
   targetTemp = 55;
   sensors.begin();
   display.initialize();
   pinMode(PIN_KEYBOARD_UP, INPUT_PULLUP);
   pinMode(PIN_KEYBOARD_DOWN, INPUT_PULLUP);
-  pinMode(PIN_KEYBOARD_ON, INPUT_PULLUP);
+  pinMode(PIN_KEYBOARD_PUMP, INPUT_PULLUP);
+  pinMode(PIN_KEYBOARD_HEATER, INPUT_PULLUP);
   pinMode(PIN_HEATER, OUTPUT);
   pinMode(PIN_PUMP, OUTPUT);
 }
@@ -51,74 +58,79 @@ void loop() {
 void updateTargetTemp() {
   int pinUp = digitalRead(PIN_KEYBOARD_UP);
   int pinDown = digitalRead(PIN_KEYBOARD_DOWN);
-  int pinOn = digitalRead(PIN_KEYBOARD_ON);
+  int pinPump = digitalRead(PIN_KEYBOARD_PUMP);
+  int pinHeater = digitalRead(PIN_KEYBOARD_HEATER);
   
   if (pinUp == LOW) {
     targetTemp ++;
+    displayNeedsToBeUpdated = true;
   }
   if (pinDown == LOW) {
     targetTemp --;
+    displayNeedsToBeUpdated = true;
   }  
-  if (pinOn == LOW) {
-    isOn = !isOn;
+  if (pinPump == LOW) {
+    isPumpOn = !isPumpOn;
+    displayNeedsToBeUpdated = true;
+    outputNeedsToBeUpdated = true;
+  }
+  if (pinHeater == LOW) {
+    heaterOn = !heaterOn;
+    displayNeedsToBeUpdated = true;
+    outputNeedsToBeUpdated = true;
   }
 }
 
 int targetTempLastUpdated = 0;
 
 void updateCurrentTemp() {
-  if (millis() - targetTempLastUpdated > 500) {
+  if (millis() - targetTempLastUpdated > 1000) {
     sensors.requestTemperaturesByIndex(0); // Send the command to get temperatures
     currentTemp = sensors.getTempCByIndex(0);
-    heaterOn = isOn && currentTemp < targetTemp;  
+    displayNeedsToBeUpdated = true;
+    outputNeedsToBeUpdated = true;
     targetTempLastUpdated = millis();
   }
 }
 
 void updateHeaterAndPump() {
-  if (isOn) {
-    digitalWrite(PIN_PUMP, LOW);
-    if (heaterOn) {
-      digitalWrite(PIN_HEATER, LOW);
-    } else {
-      digitalWrite(PIN_HEATER, HIGH);    
-    }
-  } else {
-    digitalWrite(PIN_HEATER, HIGH);
-    digitalWrite(PIN_PUMP, HIGH);
+  if (outputNeedsToBeUpdated) {
+    isHeaterOn = heaterOn && currentTemp < targetTemp;  
+
+    digitalWrite(PIN_PUMP, !isPumpOn);
+    digitalWrite(PIN_HEATER, !isHeaterOn);
+    outputNeedsToBeUpdated = false;
   }
 }
 
-int displayLastUpdated = 0;
-
 void updateDisplay() {
-  if (millis() - displayLastUpdated > 150) {
+  if (displayNeedsToBeUpdated) {
     display.clear();
     
     display.setTextSize(2);
     display.setTextColor(WHITE);
     display.setCursor(0,0);
-    display.print(targetTemp);
-    if (isOn) {
-      display.print(" ON");
-    } else {
-      display.print(" OFF");
+    display.print((int) targetTemp);
+
+    if (isPumpOn) {
+      display.setCursor(45, 0);
+      display.print("PUMP");
     }
-    
+
+    if (isHeaterOn) {
+      display.fillCircle(120, 7, 7, WHITE);
+    } else if (heaterOn) {
+      display.drawCircle(120, 7, 7, WHITE);
+    }
+
     display.fillRoundRect(0, 20, 128, 40, 8, WHITE);
     display.setTextSize(4);
     display.setTextColor(BLACK);
     display.setCursor(6, 26);
     display.print(currentTemp);
-    
-    if (heaterOn) {
-      display.fillCircle(120, 7, 7, WHITE);  
-    } else {
-      display.drawCircle(120, 7, 7, WHITE);      
-    }
-    
-    displayLastUpdated = millis();
+ 
     display.update();
+    displayNeedsToBeUpdated = false;
   }
 }
 
