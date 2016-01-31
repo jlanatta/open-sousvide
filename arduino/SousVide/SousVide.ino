@@ -9,12 +9,12 @@
 #define ONE_WIRE_BUS 2
 #define SDA_PIN 8
 #define SCL_PIN 9
-#define PIN_KEYBOARD_UP 11
-#define PIN_KEYBOARD_DOWN 12
-#define PIN_KEYBOARD_PUMP 13
-#define PIN_KEYBOARD_HEATER 10
-#define PIN_HEATER 3
-#define PIN_PUMP 4
+#define PIN_KEYBOARD_UP 3
+#define PIN_KEYBOARD_DOWN 5
+#define PIN_KEYBOARD_PUMP 6
+#define PIN_KEYBOARD_HEATER 7
+#define PIN_HEATER A1
+#define PIN_PUMP A0
 
 Adafruit_ssd1306syp display(SDA_PIN, SCL_PIN);
  
@@ -26,7 +26,7 @@ OneWire oneWire(ONE_WIRE_BUS);
 DallasTemperature sensors(&oneWire);
 
 float currentTemp;
-float targetTemp = 21;
+float targetTemp = 55;
 
 bool isPumpOn = false;
 bool heaterOn = false;
@@ -48,13 +48,13 @@ void setup()
 }
 
 void loop() {
-  updateTargetTemp();
+  readKeyboard();
   updateCurrentTemp();
   updateHeaterAndPump();
   updateDisplay();
 }
 
-void updateTargetTemp() {
+void readKeyboard() {
   int pinUp = digitalRead(PIN_KEYBOARD_UP);
   int pinDown = digitalRead(PIN_KEYBOARD_DOWN);
   int pinPump = digitalRead(PIN_KEYBOARD_PUMP);
@@ -63,10 +63,12 @@ void updateTargetTemp() {
   if (pinUp == LOW) {
     targetTemp ++;
     displayNeedsToBeUpdated = true;
+    outputNeedsToBeUpdated = true;
   }
   if (pinDown == LOW) {
     targetTemp --;
     displayNeedsToBeUpdated = true;
+    outputNeedsToBeUpdated = true;
   }  
   if (pinPump == LOW) {
     isPumpOn = !isPumpOn;
